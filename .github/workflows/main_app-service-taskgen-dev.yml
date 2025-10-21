@@ -6,28 +6,35 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  id-token: write   # required for OIDC login
+  contents: read    # required to checkout code
+
 jobs:
   setup-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ Checkout the repo
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 2️⃣ Login to Azure using bootstrap service principal
       - name: Login with bootstrap identity
         uses: azure/login@v2
         with:
+          auth-type: service-principal
           client-id: ${{ secrets.AZURE_BOOTSTRAP_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_BOOTSTRAP_TENANT_ID }}
           client-secret: ${{ secrets.AZURE_BOOTSTRAP_CLIENT_SECRET }}
           subscription-id: ${{ secrets.AZURE_BOOTSTRAP_SUBSCRIPTION_ID }}
 
-      - name: Dynamically create OIDC app registration and federated credential
+      # 3️⃣ Dynamically create OIDC app registration & federated credential
+      - name: Dynamically create OIDC app registration
         id: oidc-setup
         run: |
           set -e
           APP_NAME="github-actions-${GITHUB_REPOSITORY//\//-}"
-          GITHUB_ORG=$(echo $GITHUB_REPOSITORY | cut -d'/' -f1)
           GITHUB_REPO=$(echo $GITHUB_REPOSITORY | cut -d'/' -f2)
 
           echo "🔍 Checking if app registration $APP_NAME exists..."
@@ -60,19 +67,23 @@ jobs:
           echo "tenant-id=${{ secrets.AZURE_BOOTSTRAP_TENANT_ID }}" >> $GITHUB_OUTPUT
           echo "subscription-id=${{ secrets.AZURE_BOOTSTRAP_SUBSCRIPTION_ID }}" >> $GITHUB_OUTPUT
 
-      - name: Login to Azure via OIDC dynamically
+      # 4️⃣ Login to Azure via OIDC dynamically
+      - name: Login via OIDC
         uses: azure/login@v2
         with:
           client-id: ${{ steps.oidc-setup.outputs.client-id }}
           tenant-id: ${{ steps.oidc-setup.outputs.tenant-id }}
           subscription-id: ${{ steps.oidc-setup.outputs.subscription-id }}
+          auth-type: oidc
 
-      - name: Deploy to Azure Web App (async)
+      # 5️⃣ Deploy to Azure Web App
+      - name: Deploy to Azure Web App
         run: |
+          APP_NAME=app-service-taskGen-dev
+          RESOURCE_GROUP=<YOUR_RESOURCE_GROUP>
           zip -r release.zip . > /dev/null
           az webapp deploy \
-            --name app-service-taskGen-dev \
-            --resource-group <YOUR_RESOURCE_GROUP> \
+            --name $APP_NAME \
+            --resource-group $RESOURCE_GROUP \
             --src-path release.zip \
-            --type zip \
-            --async
+            --type zip
