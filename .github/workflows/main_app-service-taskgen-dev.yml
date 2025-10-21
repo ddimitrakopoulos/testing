@@ -64,4 +64,3 @@ jobs:
             --resource-group rg-taskGen-dev-weu \
             --src-path release.zip \
             --type zip \
-            --async
