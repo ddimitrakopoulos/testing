@@ -55,11 +55,13 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_46C4C16D22E94E47B72327DF2D4876CA }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_5F827C688111418184A0DA8AEB1076DF }}
 
-      - name: 'Deploy to Azure Web App'
-        id: deploy-to-webapp
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: 'app-service-taskGen-dev'
-          slot-name: 'Production'
-          package: .
-          
+
+      - name: Deploy to Azure Web App (async)
+        run: |
+          zip -r release.zip . > /dev/null
+          az webapp deploy \
+            --name app-service-taskGen-dev \
+            --resource-group rg-taskGen-dev-weu \
+            --src-path release.zip \
+            --type zip \
+            --async
